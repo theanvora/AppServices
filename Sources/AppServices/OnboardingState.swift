@@ -1,13 +1,26 @@
-import SwiftUI
+import Foundation
+import Observation
 
 /// Tracks first-run onboarding completion and "what's new" per app version,
-/// persisted in `UserDefaults`.
+/// persisted in `UserDefaults`. Uses the Observation framework (iOS 17+).
 @MainActor
-public final class OnboardingState: ObservableObject {
-    @AppStorage("anvora.onboarding.completed") public var hasCompletedOnboarding = false
-    @AppStorage("anvora.onboarding.lastSeenVersion") private var lastSeenVersion = ""
+@Observable
+public final class OnboardingState {
+    public private(set) var hasCompletedOnboarding: Bool
 
-    public init() {}
+    @ObservationIgnored private let defaults: UserDefaults
+    @ObservationIgnored private var lastSeenVersion: String
+
+    private enum Keys {
+        static let completed = "anvora.onboarding.completed"
+        static let lastVersion = "anvora.onboarding.lastSeenVersion"
+    }
+
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.hasCompletedOnboarding = defaults.bool(forKey: Keys.completed)
+        self.lastSeenVersion = defaults.string(forKey: Keys.lastVersion) ?? ""
+    }
 
     private var currentVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
@@ -20,10 +33,12 @@ public final class OnboardingState: ObservableObject {
 
     public func completeOnboarding() {
         hasCompletedOnboarding = true
-        lastSeenVersion = currentVersion
+        defaults.set(true, forKey: Keys.completed)
+        markWhatsNewSeen()
     }
 
     public func markWhatsNewSeen() {
         lastSeenVersion = currentVersion
+        defaults.set(currentVersion, forKey: Keys.lastVersion)
     }
 }
